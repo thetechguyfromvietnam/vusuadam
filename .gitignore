@@ -32,6 +32,7 @@ instance/
 *.sqlite
 *.sqlite3
 cayxanh.db
+/tmp/
 
 # IDE
 .vscode/

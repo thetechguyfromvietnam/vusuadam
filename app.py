@@ -7,7 +7,15 @@ from sqlalchemy import func, extract
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'kimbiofarm-secret-key-2025'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cayxanh.db'
+
+# Database URI - Vercel uses read-only filesystem except /tmp
+if os.environ.get('VERCEL'):
+    # Vercel environment - use /tmp for SQLite
+    db_path = 'sqlite:////tmp/cayxanh.db'
+else:
+    # Local development
+    db_path = os.environ.get('DATABASE_URL', 'sqlite:///cayxanh.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -374,6 +382,9 @@ def import_excel():
 # Initialize database
 with app.app_context():
     db.create_all()
+
+# For Vercel
+app = app
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
