@@ -14,16 +14,27 @@ os.environ['VERCEL'] = '1'
 try:
     from app import app, db
     
-    # Initialize database on first import (for Vercel)
-    # Use try-except to handle any database errors gracefully
+    # CRITICAL: Initialize database BEFORE any requests
+    # This must happen at import time for Vercel
     try:
         with app.app_context():
-            # Only create tables if they don't exist
+            # Force create all tables
             db.create_all()
+            # Verify tables were created
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tables = inspector.get_table_names()
+            print(f"Database initialized. Tables: {tables}")
+            if 'cayxanh' not in tables:
+                print("WARNING: cayxanh table not found after create_all()")
+                # Try to create again
+                db.create_all()
     except Exception as db_error:
-        # Log error but don't fail - database might already exist or have issues
-        print(f"Database initialization warning: {str(db_error)}")
-        # Don't print full traceback for database errors to avoid noise
+        # Log error but continue - might be permission issue
+        error_msg = f"Database initialization error: {str(db_error)}"
+        print(error_msg)
+        traceback.print_exc()
+        # Don't raise - let the app start and handle errors in routes
     
 except ImportError as import_error:
     # Critical error - cannot import app

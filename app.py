@@ -71,16 +71,35 @@ class XuatKho(db.Model):
 # Routes
 @app.route('/')
 def index():
+    # Ensure database tables exist
+    try:
+        db.create_all()
+    except Exception as e:
+        print(f"Warning: Could not ensure tables exist: {e}")
+    
     # Dashboard statistics
-    total_cay = CayXanh.query.count()
-    total_ton_kho = db.session.query(func.sum(CayXanh.ton_kho)).scalar() or 0
+    try:
+        total_cay = CayXanh.query.count()
+    except Exception as e:
+        print(f"Error querying total_cay: {e}")
+        total_cay = 0
+    
+    try:
+        total_ton_kho = db.session.query(func.sum(CayXanh.ton_kho)).scalar() or 0
+    except Exception as e:
+        print(f"Error querying total_ton_kho: {e}")
+        total_ton_kho = 0
     
     # Tổng giá trị tồn kho (lấy giá nhập mới nhất của mỗi cây)
     tong_gia_tri = 0
-    for cay in CayXanh.query.all():
-        nhap_moi_nhat = NhapKho.query.filter_by(cay_xanh_id=cay.id).order_by(NhapKho.ngay_nhap.desc()).first()
-        if nhap_moi_nhat and nhap_moi_nhat.gia_nhap and cay.ton_kho:
-            tong_gia_tri += float(cay.ton_kho) * float(nhap_moi_nhat.gia_nhap)
+    try:
+        for cay in CayXanh.query.all():
+            nhap_moi_nhat = NhapKho.query.filter_by(cay_xanh_id=cay.id).order_by(NhapKho.ngay_nhap.desc()).first()
+            if nhap_moi_nhat and nhap_moi_nhat.gia_nhap and cay.ton_kho:
+                tong_gia_tri += float(cay.ton_kho) * float(nhap_moi_nhat.gia_nhap)
+    except Exception as e:
+        print(f"Error calculating tong_gia_tri: {e}")
+        tong_gia_tri = 0
     
     # Nhập xuất trong tháng
     thang_hien_tai = datetime.now().month
