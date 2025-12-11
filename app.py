@@ -442,6 +442,38 @@ def chi_tiet_cay(ma_cay):
                          tong_so_luong_nhap=tong_so_luong_nhap,
                          tong_so_luong_xuat=tong_so_luong_xuat)
 
+@app.route('/cay/<ma_cay>/xoa', methods=['POST'])
+def xoa_cay(ma_cay):
+    """Xóa cây và tất cả lịch sử nhập xuất liên quan"""
+    cay = CayXanh.query.filter_by(ma_cay=ma_cay).first()
+    if not cay:
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Không tìm thấy cây!'})
+        flash('Không tìm thấy cây!', 'error')
+        return redirect(url_for('ton_kho'))
+    
+    # Lưu tên cây để hiển thị thông báo
+    ten_cay = cay.loai_cay
+    ma_cay_value = cay.ma_cay
+    
+    try:
+        # Xóa cây (cascade sẽ tự động xóa lịch sử nhập xuất)
+        db.session.delete(cay)
+        db.session.commit()
+        
+        if request.is_json:
+            return jsonify({'success': True, 'message': f'Đã xóa cây {ma_cay_value} ({ten_cay}) thành công!'})
+        
+        flash(f'Đã xóa cây {ma_cay_value} ({ten_cay}) thành công!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        error_msg = f'Lỗi khi xóa cây: {str(e)}'
+        if request.is_json:
+            return jsonify({'success': False, 'message': error_msg})
+        flash(error_msg, 'error')
+    
+    return redirect(url_for('ton_kho'))
+
 @app.route('/import-excel', methods=['GET', 'POST'])
 def import_excel():
     if request.method == 'POST':

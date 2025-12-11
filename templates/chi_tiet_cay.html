@@ -225,7 +225,34 @@
         <a href="{{ url_for('nhap_hang') }}" class="btn btn-success">
             <i class="bi bi-plus-circle"></i> Nhập Hàng Mới
         </a>
+        <button class="btn btn-danger" onclick="xoaCay('{{ cay.ma_cay }}', '{{ cay.loai_cay }}')">
+            <i class="bi bi-trash"></i> Xóa Cây (Không Còn Bán)
+        </button>
     </div>
 </div>
+
+<script>
+function xoaCay(maCay, tenCay) {
+    if (confirm(`Bạn có chắc chắn muốn xóa cây "${tenCay}" (${maCay})?\n\nLưu ý: Tất cả lịch sử nhập xuất liên quan cũng sẽ bị xóa. Hành động này không thể hoàn tác!`)) {
+        // Tạo form để submit POST request
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/cay/${maCay}/xoa`;
+        
+        // Thêm CSRF token nếu có
+        const csrfToken = document.querySelector('meta[name="csrf-token"]');
+        if (csrfToken) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'csrf_token';
+            input.value = csrfToken.content;
+            form.appendChild(input);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
 {% endblock %}
 

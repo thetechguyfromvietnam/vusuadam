@@ -49,6 +49,7 @@
                         <th>Loại Cây</th>
                         <th class="text-end">Tồn Kho</th>
                         <th>Cập Nhật</th>
+                        <th>Thao Tác</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -78,10 +79,17 @@
                                 {{ cay.updated_at.strftime('%d/%m/%Y %H:%M') if cay.updated_at else '-' }}
                             </small>
                         </td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" 
+                                    onclick="xoaCay('{{ cay.ma_cay }}', '{{ cay.loai_cay }}')"
+                                    title="Xóa cây (không còn bán nữa)">
+                                <i class="bi bi-trash"></i> Xóa
+                            </button>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">
+                        <td colspan="6" class="text-center text-muted py-4">
                             <i class="bi bi-inbox" style="font-size: 3rem;"></i>
                             <p class="mt-2">Không tìm thấy dữ liệu</p>
                         </td>
@@ -133,5 +141,29 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+function xoaCay(maCay, tenCay) {
+    if (confirm(`Bạn có chắc chắn muốn xóa cây "${tenCay}" (${maCay})?\n\nLưu ý: Tất cả lịch sử nhập xuất liên quan cũng sẽ bị xóa. Hành động này không thể hoàn tác!`)) {
+        // Tạo form để submit POST request
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/cay/${maCay}/xoa`;
+        
+        // Thêm CSRF token nếu có
+        const csrfToken = document.querySelector('meta[name="csrf-token"]');
+        if (csrfToken) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'csrf_token';
+            input.value = csrfToken.content;
+            form.appendChild(input);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
 {% endblock %}
 
