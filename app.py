@@ -379,17 +379,14 @@ def import_excel():
     
     return render_template('import_excel.html')
 
-# Initialize database - only in local, not in Vercel (lazy initialization)
-def init_db():
+# Initialize database - lazy initialization in api/index.py for Vercel
+# For local development, initialize here
+if __name__ == '__main__':
     try:
         with app.app_context():
             db.create_all()
     except Exception as e:
         print(f"Warning: Could not initialize database: {e}")
-
-# Only initialize if running locally
-if __name__ == '__main__':
-    init_db()
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

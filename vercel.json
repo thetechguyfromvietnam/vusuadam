@@ -14,5 +14,11 @@
   ],
   "env": {
     "PYTHONPATH": "."
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.py"
+    }
+  ]
 }
