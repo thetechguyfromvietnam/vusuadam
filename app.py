@@ -97,49 +97,27 @@ def fix_postgres_url(url):
     # Last resort: return original URL (might work if already properly formatted)
     return url
 
-# Database URI - Support both PostgreSQL (Vercel) and SQLite (local)
-if os.environ.get('POSTGRES_URL') or (os.environ.get('DATABASE_URL') and 'postgres' in os.environ.get('DATABASE_URL', '').lower()):
-    # Use PostgreSQL (Vercel production)
-    db_url = os.environ.get('POSTGRES_URL') or os.environ.get('DATABASE_URL')
-    
-    # Check if connection string still has placeholder
-    if '[YOUR_PASSWORD]' in db_url or '[YOUR-PASSWORD]' in db_url:
-        print("WARNING: Connection string contains password placeholder. Falling back to SQLite.")
+# Database Configuration
+# - Production (Vercel/Supabase): Sử dụng PostgreSQL khi có DATABASE_URL hoặc POSTGRES_URL
+# - Local Development: Sử dụng SQLite
+db_url = os.environ.get('POSTGRES_URL') or os.environ.get('DATABASE_URL', '')
+
+if db_url and 'postgres' in db_url.lower():
+    # Production: Sử dụng PostgreSQL
+    try:
+        db_path = fix_postgres_url(db_url)
+        if '@' in db_path:
+            masked = db_path.split('@')[0].split(':')[0] + ':***@' + '@'.join(db_path.split('@')[1:])
+            print(f"Using PostgreSQL (Production): {masked}")
+    except Exception as e:
+        print(f"Error parsing PostgreSQL connection string: {e}")
         db_path = 'sqlite:///cayxanh.db'
-    else:
-        try:
-            # Validate connection string format before processing
-            if not db_url.startswith(('postgres://', 'postgresql://')):
-                print(f"ERROR: Invalid connection string format. Must start with postgres:// or postgresql://")
-                print("Falling back to SQLite.")
-                db_path = 'sqlite:///cayxanh.db'
-            else:
-                db_path = fix_postgres_url(db_url)
-                # Validate the fixed URL
-                if not db_path.startswith('postgresql://'):
-                    print(f"ERROR: Fixed URL doesn't start with postgresql://: {db_path[:50]}...")
-                    print("Falling back to SQLite.")
-                    db_path = 'sqlite:///cayxanh.db'
-                else:
-                    # Log connection info (masked) for debugging
-                    if '@' in db_path:
-                        try:
-                            masked = db_path.split('@')[0].split(':')[0] + ':***@' + '@'.join(db_path.split('@')[1:])
-                            print(f"Using PostgreSQL connection: {masked}")
-                        except:
-                            print(f"Using PostgreSQL connection: [masked]")
-        except Exception as e:
-            print(f"ERROR: Failed to parse PostgreSQL connection string: {e}")
-            import traceback
-            traceback.print_exc()
-            print("Falling back to SQLite.")
-            db_path = 'sqlite:///cayxanh.db'
-elif os.environ.get('VERCEL'):
-    # Vercel without Postgres - use /tmp for SQLite (not recommended)
-    db_path = 'sqlite:////tmp/cayxanh.db'
+        print("Falling back to SQLite")
 else:
-    # Local development - use SQLite
-    db_path = os.environ.get('DATABASE_URL', 'sqlite:///cayxanh.db')
+    # Local Development: Sử dụng SQLite
+    db_path = 'sqlite:///cayxanh.db'
+    print("Using SQLite (Local Development)")
+
 app.config['SQLALCHEMY_DATABASE_URI'] = db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -471,61 +449,100 @@ def import_excel():
             return redirect(url_for('import_excel'))
         
         try:
-            # Đọc file Excel
-            df = pd.read_excel(file, sheet_name='NHẬP XUẤT TỒN  T12.2015')
+            # Đọc file Excel - format đơn giản: Tên hàng, Số lượng, Giá tiền, Ngày
+            df = pd.read_excel(file)
+            
+            # Tìm các cột (hỗ trợ nhiều tên cột khác nhau)
+            ten_hang_col = None
+            so_luong_col = None
+            gia_tien_col = None
+            phi_ship_col = None
+            ngay_col = None
+            
+            for col in df.columns:
+                col_lower = str(col).lower().strip()
+                if 'tên' in col_lower or 'hàng' in col_lower or 'loại' in col_lower or 'cây' in col_lower:
+                    ten_hang_col = col
+                elif 'số lượng' in col_lower or 'sl' in col_lower or 'quantity' in col_lower:
+                    so_luong_col = col
+                elif 'giá' in col_lower or 'price' in col_lower or 'giá tiền' in col_lower:
+                    gia_tien_col = col
+                elif 'phí' in col_lower and 'ship' in col_lower:
+                    phi_ship_col = col
+                elif 'ngày' in col_lower or 'date' in col_lower:
+                    ngay_col = col
+            
+            if not ten_hang_col or not so_luong_col or not gia_tien_col or not ngay_col:
+                flash('File Excel phải có các cột: Tên hàng, Số lượng, Giá tiền, Ngày (Phí ship là tùy chọn)', 'error')
+                return redirect(url_for('import_excel'))
             
             imported = 0
-            updated = 0
             
             for _, row in df.iterrows():
-                ma_cay = str(row.get('MÃ CÂY', '')).strip()
-                loai_cay = str(row.get('LOẠI CÂY', '')).strip()
-                ton_kho = float(row.get('TỒN từ 3.12.25', 0) or 0)
+                ten_hang = str(row.get(ten_hang_col, '')).strip()
+                so_luong = row.get(so_luong_col)
+                gia_tien = row.get(gia_tien_col)
+                phi_ship = row.get(phi_ship_col) if phi_ship_col else None
+                ngay_nhap = row.get(ngay_col)
                 
-                if not ma_cay or ma_cay == 'nan':
+                # Bỏ qua dòng trống
+                if pd.isna(ten_hang) or ten_hang == '' or ten_hang == 'nan':
                     continue
+                
+                # Xử lý số lượng, giá và phí ship (cho phép số lượng = 0)
+                try:
+                    so_luong = float(so_luong) if pd.notna(so_luong) else 0.0
+                    gia_tien = float(gia_tien) if pd.notna(gia_tien) else 0.0
+                    phi_ship = float(phi_ship) if pd.notna(phi_ship) and phi_ship_col else 0.0
+                    ngay_nhap = pd.to_datetime(ngay_nhap).date() if pd.notna(ngay_nhap) else date.today()
+                except:
+                    # Nếu không parse được, đặt giá trị mặc định
+                    so_luong = 0.0
+                    gia_tien = 0.0
+                    phi_ship = 0.0
+                    ngay_nhap = date.today()
+                
+                # Tạo mã cây tự động từ tên hàng (hoặc tìm nếu đã có)
+                # Sử dụng tên hàng làm mã cây nếu chưa có mã
+                ma_cay = ten_hang[:50]  # Giới hạn độ dài mã cây
                 
                 # Tìm hoặc tạo cây
                 cay = CayXanh.query.filter_by(ma_cay=ma_cay).first()
-                if cay:
-                    cay.loai_cay = loai_cay
-                    cay.ton_kho = ton_kho
-                    updated += 1
-                else:
-                    cay = CayXanh(ma_cay=ma_cay, loai_cay=loai_cay, ton_kho=ton_kho)
+                if not cay:
+                    cay = CayXanh(ma_cay=ma_cay, loai_cay=ten_hang, ton_kho=0)
                     db.session.add(cay)
+                    db.session.flush()
                     imported += 1
+                else:
+                    # Cập nhật tên nếu khác
+                    if cay.loai_cay != ten_hang:
+                        cay.loai_cay = ten_hang
                 
-                # Import nhập kho nếu có (xử lý tên cột có thể có khoảng trắng)
-                so_luong_nhap = row.get('SỐ LƯỢNG NHẬP') or row.get('SỐ LƯỢNG NHẬP ')
-                gia_nhap = row.get('GIÁ NHẬP')
-                phi_ship_raw = row.get('PHÍ SHIP', 0)
-                ngay_nhap = row.get('NGÀY NHẬP')
-                ghi_chu = str(row.get('GHI CHÚ', '')).strip() if pd.notna(row.get('GHI CHÚ')) else ''
-                
-                if pd.notna(so_luong_nhap) and pd.notna(gia_nhap) and pd.notna(ngay_nhap):
-                    # Xử lý NaN cho phi_ship
-                    phi_ship = 0.0
-                    if pd.notna(phi_ship_raw):
-                        phi_ship = float(phi_ship_raw)
-                    
-                    tong_tien = (float(so_luong_nhap) * float(gia_nhap)) + phi_ship
+                # Chỉ tạo phiếu nhập nếu số lượng > 0
+                if so_luong > 0 and gia_tien > 0:
+                    tong_tien = (so_luong * gia_tien) + phi_ship
                     nhap_kho = NhapKho(
                         cay_xanh_id=cay.id,
-                        so_luong=float(so_luong_nhap),
-                        gia_nhap=float(gia_nhap),
-                        phi_ship=float(phi_ship),
+                        so_luong=so_luong,
+                        gia_nhap=gia_tien,
+                        phi_ship=phi_ship,
                         tong_tien=tong_tien,
-                        ngay_nhap=pd.to_datetime(ngay_nhap).date(),
-                        ghi_chu=ghi_chu
+                        ngay_nhap=ngay_nhap,
+                        ghi_chu='Import từ Excel'
                     )
                     db.session.add(nhap_kho)
+                
+                # Cập nhật tồn kho (kể cả số lượng = 0)
+                cay.ton_kho = so_luong
+                cay.updated_at = datetime.now()
             
             db.session.commit()
-            flash(f'Import thành công! Đã thêm {imported} cây mới, cập nhật {updated} cây.', 'success')
+            flash(f'Import thành công! Đã import {imported} hàng mới và cập nhật tồn kho.', 'success')
         except Exception as e:
             db.session.rollback()
             flash(f'Lỗi khi import: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
         
         return redirect(url_for('import_excel'))
     
