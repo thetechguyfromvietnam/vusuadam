@@ -74,9 +74,22 @@ python app.py
 ## 🛠️ Công Nghệ Sử Dụng
 
 - **Backend**: Flask (Python)
-- **Database**: SQLite
+- **Database**: PostgreSQL (Supabase/Vercel) hoặc SQLite (local development)
 - **Frontend**: Bootstrap 5, jQuery
 - **Icons**: Bootstrap Icons
+
+## ⚙️ Cấu Hình Database
+
+### Local Development (SQLite)
+Mặc định sử dụng SQLite, không cần cấu hình gì thêm.
+
+### Production (PostgreSQL)
+1. Tạo file `.env` trong thư mục gốc
+2. Thêm connection string:
+   ```
+   DATABASE_URL=postgresql://postgres:your_password@db.xxx.supabase.co:5432/postgres
+   ```
+3. Ứng dụng sẽ tự động sử dụng PostgreSQL khi phát hiện `DATABASE_URL` hoặc `POSTGRES_URL`
 
 ## 📞 Hỗ Trợ
 
