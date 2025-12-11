@@ -11,16 +11,14 @@ os.environ['VERCEL'] = '1'
 
 # Import app after path is set
 try:
-    from app import app
+    from app import app, db
     
-    # Initialize database on first request (lazy initialization)
-    @app.before_first_request
-    def create_tables():
-        try:
-            from app import db
+    # Initialize database on first import (for Vercel)
+    try:
+        with app.app_context():
             db.create_all()
-        except Exception as e:
-            print(f"Warning: Could not initialize database: {e}")
+    except Exception as e:
+        print(f"Warning: Could not initialize database: {e}")
     
 except ImportError as e:
     print(f"Import error: {e}")
