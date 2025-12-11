@@ -1,0 +1,45 @@
+HUONG DAN LAY CONNECTION STRING TU SUPABASE
+===========================================
+
+1. MO TRINH DUYET:
+   - Vao: https://app.supabase.com
+   - Dang nhap tai khoan
+
+2. CHON PROJECT:
+   - Tim project: "supabase-gray-dog"
+   - Click vao project do
+
+3. VAO SETTINGS:
+   - O sidebar trai, click "Settings" (icon bánh răng)
+   - Click "Database" trong menu
+
+4. TIM CONNECTION STRING:
+   - Scroll xuong tim muc "Connection string"
+   - Co 2 loai:
+     * URI (Session mode) - Dung cai nay
+     * Connection pooling - Cho production
+
+5. COPY:
+   - Click nut "Copy" hoac highlight va copy
+   - Format se la:
+     postgresql://postgres:[YOUR-PASSWORD]@db.xxx.supabase.co:5432/postgres
+
+6. THAY PASSWORD:
+   - Thay [YOUR-PASSWORD] bang password that
+   - Neu chua biet password:
+     * Vao Settings -> Database
+     * Click "Reset database password"
+     * Hoac xem trong "Database" -> "Connection info"
+
+7. KET QUA:
+   Connection string cuoi cung se la:
+   postgresql://postgres:MAT_KHAU_THAT@db.xxx.supabase.co:5432/postgres
+
+   VI DU:
+   postgresql://postgres:MyPass123@db.abcdefgh.supabase.co:5432/postgres
+
+LUU Y QUAN TRONG:
+- KHONG de [YOUR-PASSWORD] trong connection string
+- Phai thay bang password that
+- Connection string phai day du, khong thieu phan nao
+
