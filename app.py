@@ -387,7 +387,5 @@ if __name__ == '__main__':
             db.create_all()
     except Exception as e:
         print(f"Warning: Could not initialize database: {e}")
-
-if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
 
