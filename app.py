@@ -5,6 +5,7 @@ import pandas as pd
 import os
 from urllib.parse import quote_plus, urlparse, urlunparse
 from sqlalchemy import func, extract
+from sqlalchemy.engine.url import URL
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -22,9 +23,31 @@ def fix_postgres_url(url):
     if url.startswith('postgres://'):
         url = url.replace('postgres://', 'postgresql://', 1)
     
-    # Parse and rebuild the URL with proper encoding
+    # Try using SQLAlchemy's URL parser first (most reliable)
     try:
-        # Use urllib.parse to properly handle the URL
+        # SQLAlchemy's make_url can parse connection strings properly
+        from sqlalchemy.engine.url import make_url
+        parsed = make_url(url)
+        
+        # Rebuild using SQLAlchemy's URL.create which handles encoding automatically
+        if parsed.password:
+            # URL.create will properly encode special characters
+            # Don't include query parameters as they might cause issues with psycopg2
+            fixed_url = URL.create(
+                drivername='postgresql',
+                username=parsed.username,
+                password=parsed.password,  # SQLAlchemy handles encoding
+                host=parsed.host,
+                port=parsed.port,
+                database=parsed.database.lstrip('/') if parsed.database else None
+                # Explicitly exclude query parameters
+            )
+            return str(fixed_url)
+    except Exception as e:
+        print(f"Warning: SQLAlchemy URL parsing failed: {e}, trying manual parsing...")
+    
+    # Fallback: manual parsing with urllib
+    try:
         parsed = urlparse(url)
         
         if parsed.username and parsed.password:
@@ -33,18 +56,21 @@ def fix_postgres_url(url):
             encoded_username = quote_plus(parsed.username)
             
             # Reconstruct the URL with encoded credentials
-            # Format: postgresql://username:password@host:port/database
             netloc = f"{encoded_username}:{encoded_password}@{parsed.hostname}"
             if parsed.port:
                 netloc += f":{parsed.port}"
             
+            # Clean up database path (remove leading /)
+            db_path = parsed.path.lstrip('/') if parsed.path else ''
+            
+            # Don't include query parameters, params, or fragment as they might cause issues
             fixed_url = urlunparse((
-                'postgresql',  # Always use postgresql://
+                'postgresql',
                 netloc,
-                parsed.path,
-                parsed.params,
-                parsed.query,
-                parsed.fragment
+                '/' + db_path if db_path else '/',
+                '',  # No params
+                '',  # No query parameters
+                ''   # No fragment
             ))
             return fixed_url
         elif parsed.username:
@@ -54,20 +80,21 @@ def fix_postgres_url(url):
             if parsed.port:
                 netloc += f":{parsed.port}"
             
+            db_path = parsed.path.lstrip('/') if parsed.path else ''
+            # Don't include query parameters, params, or fragment
             fixed_url = urlunparse((
                 'postgresql',
                 netloc,
-                parsed.path,
-                parsed.params,
-                parsed.query,
-                parsed.fragment
+                '/' + db_path if db_path else '/',
+                '',  # No params
+                '',  # No query parameters
+                ''   # No fragment
             ))
             return fixed_url
     except Exception as e:
-        print(f"Warning: Could not parse connection string: {e}")
-        # Return original URL - might work if already properly formatted
-        pass
+        print(f"Warning: Manual URL parsing also failed: {e}")
     
+    # Last resort: return original URL (might work if already properly formatted)
     return url
 
 # Database URI - Support both PostgreSQL (Vercel) and SQLite (local)
@@ -81,13 +108,30 @@ if os.environ.get('POSTGRES_URL') or (os.environ.get('DATABASE_URL') and 'postgr
         db_path = 'sqlite:///cayxanh.db'
     else:
         try:
-            db_path = fix_postgres_url(db_url)
-            # Log connection info (masked) for debugging
-            if db_path and '@' in db_path:
-                masked = db_path.split('@')[0].split(':')[0] + ':***@' + '@'.join(db_path.split('@')[1:])
-                print(f"Using PostgreSQL connection: {masked}")
+            # Validate connection string format before processing
+            if not db_url.startswith(('postgres://', 'postgresql://')):
+                print(f"ERROR: Invalid connection string format. Must start with postgres:// or postgresql://")
+                print("Falling back to SQLite.")
+                db_path = 'sqlite:///cayxanh.db'
+            else:
+                db_path = fix_postgres_url(db_url)
+                # Validate the fixed URL
+                if not db_path.startswith('postgresql://'):
+                    print(f"ERROR: Fixed URL doesn't start with postgresql://: {db_path[:50]}...")
+                    print("Falling back to SQLite.")
+                    db_path = 'sqlite:///cayxanh.db'
+                else:
+                    # Log connection info (masked) for debugging
+                    if '@' in db_path:
+                        try:
+                            masked = db_path.split('@')[0].split(':')[0] + ':***@' + '@'.join(db_path.split('@')[1:])
+                            print(f"Using PostgreSQL connection: {masked}")
+                        except:
+                            print(f"Using PostgreSQL connection: [masked]")
         except Exception as e:
             print(f"ERROR: Failed to parse PostgreSQL connection string: {e}")
+            import traceback
+            traceback.print_exc()
             print("Falling back to SQLite.")
             db_path = 'sqlite:///cayxanh.db'
 elif os.environ.get('VERCEL'):
