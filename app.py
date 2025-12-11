@@ -379,12 +379,17 @@ def import_excel():
     
     return render_template('import_excel.html')
 
-# Initialize database
-try:
-    with app.app_context():
-        db.create_all()
-except Exception as e:
-    print(f"Warning: Could not initialize database: {e}")
+# Initialize database - only in local, not in Vercel (lazy initialization)
+def init_db():
+    try:
+        with app.app_context():
+            db.create_all()
+    except Exception as e:
+        print(f"Warning: Could not initialize database: {e}")
+
+# Only initialize if running locally
+if __name__ == '__main__':
+    init_db()
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
