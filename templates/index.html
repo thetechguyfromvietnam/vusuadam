@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Quản Lý Cây Xanh{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-speedometer2"></i> Dashboard
+        </h1>
+    </div>
+</div>
+
+<!-- Thống kê tổng quan -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Tổng Số Loại Cây</h6>
+                        <h2 class="mb-0">{{ total_cay }}</h2>
+                    </div>
+                    <i class="bi bi-tree" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Tổng Tồn Kho</h6>
+                        <h2 class="mb-0">{{ "%.0f"|format(total_ton_kho) }}</h2>
+                        <small>cây</small>
+                    </div>
+                    <i class="bi bi-box-seam" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Nhập Tháng Này</h6>
+                        <h2 class="mb-0">{{ "%.0f"|format(tong_nhap_thang) }}</h2>
+                        <small>cây</small>
+                    </div>
+                    <i class="bi bi-box-arrow-in-down" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Xuất Tháng Này</h6>
+                        <h2 class="mb-0">{{ "%.0f"|format(tong_xuat_thang) }}</h2>
+                        <small>cây</small>
+                    </div>
+                    <i class="bi bi-box-arrow-up" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-trophy"></i> Top 10 Cây Tồn Kho Cao Nhất</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>STT</th>
+                                <th>Mã Cây</th>
+                                <th>Loại Cây</th>
+                                <th class="text-end">Tồn Kho</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cay in top_ton_kho %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td><strong>{{ cay.ma_cay }}</strong></td>
+                                <td>{{ cay.loai_cay }}</td>
+                                <td class="text-end">
+                                    {% if cay.ton_kho and cay.ton_kho > 0 %}
+                                    <span class="badge bg-success">{{ "%.0f"|format(cay.ton_kho) }} cây</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">0 cây</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Chưa có dữ liệu</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-cash-stack"></i> Tổng Giá Trị Tồn Kho</h5>
+            </div>
+            <div class="card-body text-center">
+                <h1 class="display-4 text-primary">
+                    {{ "{:,.0f}".format(tong_gia_tri) }} đ
+                </h1>
+                <p class="text-muted">Tính theo giá nhập mới nhất</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lịch sử nhập xuất -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-box-arrow-in-down"></i> Lịch Sử Nhập Gần Đây</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Ngày</th>
+                                <th>Loại Cây</th>
+                                <th class="text-end">SL</th>
+                                <th class="text-end">Giá</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for nhap in lich_su_nhap %}
+                            <tr>
+                                <td>{{ nhap.ngay_nhap.strftime('%d/%m/%Y') }}</td>
+                                <td>{{ nhap.cay_xanh.loai_cay }}</td>
+                                <td class="text-end">{{ "%.0f"|format(nhap.so_luong) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(nhap.gia_nhap) }} đ</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Chưa có dữ liệu</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <a href="{{ url_for('lich_su', loai='nhap') }}" class="btn btn-sm btn-outline-info">
+                    Xem tất cả <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-warning text-white">
+                <h5 class="mb-0"><i class="bi bi-box-arrow-up"></i> Lịch Sử Xuất Gần Đây</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Ngày</th>
+                                <th>Loại Cây</th>
+                                <th class="text-end">SL</th>
+                                <th>Lý Do</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for xuat in lich_su_xuat %}
+                            <tr>
+                                <td>{{ xuat.ngay_xuat.strftime('%d/%m/%Y') }}</td>
+                                <td>{{ xuat.cay_xanh.loai_cay }}</td>
+                                <td class="text-end">{{ "%.0f"|format(xuat.so_luong) }}</td>
+                                <td>{{ xuat.ly_do or '-' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Chưa có dữ liệu</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <a href="{{ url_for('lich_su', loai='xuat') }}" class="btn btn-sm btn-outline-warning">
+                    Xem tất cả <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

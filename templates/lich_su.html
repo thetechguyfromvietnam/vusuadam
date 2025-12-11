@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Lịch Sử Nhập Xuất - Quản Lý Cây Xanh{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-clock-history"></i> Lịch Sử Nhập Xuất
+        </h1>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <a class="nav-link {% if loai == 'all' or not loai %}active{% endif %}" 
+                   href="{{ url_for('lich_su', loai='all') }}">
+                    <i class="bi bi-list"></i> Tất Cả
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if loai == 'nhap' %}active{% endif %}" 
+                   href="{{ url_for('lich_su', loai='nhap') }}">
+                    <i class="bi bi-box-arrow-in-down"></i> Lịch Sử Nhập
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if loai == 'xuat' %}active{% endif %}" 
+                   href="{{ url_for('lich_su', loai='xuat') }}">
+                    <i class="bi bi-box-arrow-up"></i> Lịch Sử Xuất
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <p class="text-muted">Vui lòng chọn tab phía trên để xem chi tiết lịch sử nhập hoặc xuất.</p>
+    </div>
+</div>
+{% endblock %}
+

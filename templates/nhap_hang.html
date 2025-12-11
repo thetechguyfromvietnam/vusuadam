@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Nhập Hàng - Quản Lý Cây Xanh{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-box-arrow-in-down"></i> Nhập Hàng
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Phiếu Nhập Hàng</h5>
+            </div>
+            <div class="card-body">
+                <form id="formNhapHang">
+                    <div class="mb-3">
+                        <label class="form-label">Mã Cây <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="ma_cay" name="ma_cay" 
+                               placeholder="VD: BUOI1, MAN1..." required>
+                        <small class="form-text text-muted">Nhập mã cây mới hoặc chọn từ danh sách</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Chọn Cây Có Sẵn (nếu có)</label>
+                        <select class="form-select" id="chon_cay">
+                            <option value="">-- Chọn cây có sẵn --</option>
+                            {% for cay in danh_sach_cay %}
+                            <option value="{{ cay.ma_cay }}" data-loai="{{ cay.loai_cay }}">{{ cay.ma_cay }} - {{ cay.loai_cay }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Loại Cây <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="loai_cay" name="loai_cay" 
+                               placeholder="VD: Bưởi ruby, Mận xanh..." required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Số Lượng Nhập <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="so_luong" name="so_luong" 
+                                   min="0" step="0.01" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Ngày Nhập <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="ngay_nhap" name="ngay_nhap" 
+                                   value="{{ today }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Giá Nhập (đ/cây) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="gia_nhap" name="gia_nhap" 
+                                   min="0" step="1000" required>
+                            <small class="form-text text-muted">Giá nhập có thể thay đổi theo từng lần nhập</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phí Ship (đ)</label>
+                            <input type="number" class="form-control" id="phi_ship" name="phi_ship" 
+                                   min="0" step="1000" value="0">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Tổng Tiền</label>
+                        <input type="text" class="form-control bg-light" id="tong_tien" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Ghi Chú</label>
+                        <textarea class="form-control" id="ghi_chu" name="ghi_chu" rows="3" 
+                                  placeholder="Ghi chú về lần nhập hàng này..."></textarea>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-circle"></i> Xác Nhận Nhập Hàng
+                        </button>
+                        <button type="reset" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-clockwise"></i> Làm Mới
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="alertContainer"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Chọn cây có sẵn
+    $('#chon_cay').change(function() {
+        const option = $(this).find('option:selected');
+        if (option.val()) {
+            $('#ma_cay').val(option.val());
+            $('#loai_cay').val(option.data('loai'));
+            
+            // Lấy thông tin cây
+            $.get('/api/cay/' + option.val(), function(data) {
+                if (data.success && data.gia_nhap_moi_nhat) {
+                    $('#gia_nhap').val(data.gia_nhap_moi_nhat);
+                }
+            });
+        }
+    });
+    
+    // Tính tổng tiền
+    function tinhTongTien() {
+        const soLuong = parseFloat($('#so_luong').val()) || 0;
+        const giaNhap = parseFloat($('#gia_nhap').val()) || 0;
+        const phiShip = parseFloat($('#phi_ship').val()) || 0;
+        const tongTien = (soLuong * giaNhap) + phiShip;
+        $('#tong_tien').val(tongTien.toLocaleString('vi-VN') + ' đ');
+    }
+    
+    $('#so_luong, #gia_nhap, #phi_ship').on('input', tinhTongTien);
+    
+    // Submit form
+    $('#formNhapHang').submit(function(e) {
+        e.preventDefault();
+        
+        const data = {
+            ma_cay: $('#ma_cay').val(),
+            loai_cay: $('#loai_cay').val(),
+            so_luong: $('#so_luong').val(),
+            gia_nhap: $('#gia_nhap').val(),
+            phi_ship: $('#phi_ship').val() || 0,
+            ngay_nhap: $('#ngay_nhap').val(),
+            ghi_chu: $('#ghi_chu').val()
+        };
+        
+        $.ajax({
+            url: '{{ url_for("nhap_hang") }}',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(response) {
+                if (response.success) {
+                    showAlert('success', response.message);
+                    $('#formNhapHang')[0].reset();
+                    $('#tong_tien').val('');
+                    setTimeout(() => {
+                        window.location.href = '{{ url_for("ton_kho") }}';
+                    }, 1500);
+                } else {
+                    showAlert('danger', response.message);
+                }
+            },
+            error: function() {
+                showAlert('danger', 'Có lỗi xảy ra! Vui lòng thử lại.');
+            }
+        });
+    });
+    
+    function showAlert(type, message) {
+        const alert = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('#alertContainer').html(alert);
+        setTimeout(() => {
+            $('.alert').alert('close');
+        }, 5000);
+    }
+});
+</script>
+{% endblock %}
+

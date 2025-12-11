@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Xuất Hàng - Quản Lý Cây Xanh{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-box-arrow-up"></i> Xuất Hàng
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header bg-warning text-white">
+                <h5 class="mb-0"><i class="bi bi-dash-circle"></i> Phiếu Xuất Hàng</h5>
+            </div>
+            <div class="card-body">
+                <form id="formXuatHang">
+                    <div class="mb-3">
+                        <label class="form-label">Chọn Cây <span class="text-danger">*</span></label>
+                        <select class="form-select" id="ma_cay" name="ma_cay" required>
+                            <option value="">-- Chọn cây --</option>
+                            {% for cay in danh_sach_cay %}
+                            <option value="{{ cay.ma_cay }}" data-ton="{{ cay.ton_kho }}" data-loai="{{ cay.loai_cay }}">
+                                {{ cay.ma_cay }} - {{ cay.loai_cay }} (Tồn: {{ "%.0f"|format(cay.ton_kho) }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted" id="tonKhoInfo"></small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Loại Cây</label>
+                        <input type="text" class="form-control bg-light" id="loai_cay" readonly>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Số Lượng Xuất <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="so_luong" name="so_luong" 
+                                   min="0" step="0.01" required>
+                            <small class="form-text text-danger" id="soLuongError"></small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Ngày Xuất <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="ngay_xuat" name="ngay_xuat" 
+                                   value="{{ today }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Lý Do Xuất <span class="text-danger">*</span></label>
+                        <select class="form-select" id="ly_do" name="ly_do" required>
+                            <option value="">-- Chọn lý do --</option>
+                            <option value="Bán hàng">Bán hàng</option>
+                            <option value="Mất">Mất</option>
+                            <option value="Hỏng">Hỏng</option>
+                            <option value="Chuyển kho">Chuyển kho</option>
+                            <option value="Khác">Khác</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Ghi Chú</label>
+                        <textarea class="form-control" id="ghi_chu" name="ghi_chu" rows="3" 
+                                  placeholder="Ghi chú về lần xuất hàng này..."></textarea>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-warning btn-lg">
+                            <i class="bi bi-check-circle"></i> Xác Nhận Xuất Hàng
+                        </button>
+                        <button type="reset" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-clockwise"></i> Làm Mới
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="alertContainer"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    let tonKhoHienTai = 0;
+    
+    // Chọn cây
+    $('#ma_cay').change(function() {
+        const option = $(this).find('option:selected');
+        if (option.val()) {
+            tonKhoHienTai = parseFloat(option.data('ton')) || 0;
+            $('#loai_cay').val(option.data('loai'));
+            $('#tonKhoInfo').text(`Tồn kho hiện tại: ${tonKhoHienTai.toLocaleString('vi-VN')} cây`);
+            $('#soLuongError').text('');
+        } else {
+            $('#loai_cay').val('');
+            $('#tonKhoInfo').text('');
+        }
+    });
+    
+    // Kiểm tra số lượng
+    $('#so_luong').on('input', function() {
+        const soLuong = parseFloat($(this).val()) || 0;
+        if (soLuong > tonKhoHienTai) {
+            $('#soLuongError').text(`Số lượng vượt quá tồn kho! (Tồn: ${tonKhoHienTai.toLocaleString('vi-VN')})`);
+        } else {
+            $('#soLuongError').text('');
+        }
+    });
+    
+    // Submit form
+    $('#formXuatHang').submit(function(e) {
+        e.preventDefault();
+        
+        const soLuong = parseFloat($('#so_luong').val()) || 0;
+        if (soLuong > tonKhoHienTai) {
+            showAlert('danger', 'Số lượng xuất vượt quá tồn kho!');
+            return;
+        }
+        
+        const data = {
+            ma_cay: $('#ma_cay').val(),
+            so_luong: $('#so_luong').val(),
+            ngay_xuat: $('#ngay_xuat').val(),
+            ly_do: $('#ly_do').val(),
+            ghi_chu: $('#ghi_chu').val()
+        };
+        
+        $.ajax({
+            url: '{{ url_for("xuat_hang") }}',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(response) {
+                if (response.success) {
+                    showAlert('success', response.message);
+                    $('#formXuatHang')[0].reset();
+                    setTimeout(() => {
+                        window.location.href = '{{ url_for("ton_kho") }}';
+                    }, 1500);
+                } else {
+                    showAlert('danger', response.message);
+                }
+            },
+            error: function() {
+                showAlert('danger', 'Có lỗi xảy ra! Vui lòng thử lại.');
+            }
+        });
+    });
+    
+    function showAlert(type, message) {
+        const alert = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('#alertContainer').html(alert);
+        setTimeout(() => {
+            $('.alert').alert('close');
+        }, 5000);
+    }
+});
+</script>
+{% endblock %}
+

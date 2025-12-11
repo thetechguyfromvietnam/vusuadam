@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Import Excel - Quản Lý Cây Xanh{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-file-earmark-excel"></i> Import Dữ Liệu Từ Excel
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-upload"></i> Upload File Excel</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> <strong>Hướng dẫn:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>File Excel phải có sheet tên: <strong>"NHẬP XUẤT TỒN  T12.2015"</strong></li>
+                        <li>Các cột cần có: MÃ CÂY, LOẠI CÂY, TỒN từ 3.12.25, SỐ LƯỢNG NHẬP, GIÁ NHẬP, PHÍ SHIP, NGÀY NHẬP, GHI CHÚ</li>
+                        <li>Dữ liệu sẽ được import vào hệ thống, nếu mã cây đã tồn tại sẽ được cập nhật</li>
+                    </ul>
+                </div>
+                
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Chọn File Excel <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control" name="file" accept=".xlsx,.xls" required>
+                        <small class="form-text text-muted">Chỉ chấp nhận file .xlsx hoặc .xls</small>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-upload"></i> Import Dữ Liệu
+                        </button>
+                        <a href="{{ url_for('ton_kho') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Quay Lại
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
