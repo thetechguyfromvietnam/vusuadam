@@ -4,6 +4,10 @@ from datetime import datetime, date
 import pandas as pd
 import os
 from sqlalchemy import func, extract
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'kimbiofarm-secret-key-2025'
