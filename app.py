@@ -14,6 +14,12 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'kimbiofarm-secret-key-2025'
 
+# Cấu hình instance_path cho Vercel (read-only filesystem)
+# Trên Vercel, chỉ có thể ghi vào /tmp
+# Phải set trước khi khởi tạo SQLAlchemy để tránh lỗi read-only filesystem
+if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
+    app.instance_path = '/tmp'
+
 def fix_postgres_url(url):
     """Fix PostgreSQL connection string by properly encoding password and handling special characters"""
     if not url or 'postgres' not in url.lower():
