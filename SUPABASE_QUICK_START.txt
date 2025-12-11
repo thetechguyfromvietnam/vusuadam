@@ -1,0 +1,37 @@
+HUONG DAN SU DUNG SUPABASE
+===========================
+
+Project: supabase-gray-dog
+
+BUOC 1: Lay Connection String
+------------------------------
+1. Vao: https://app.supabase.com
+2. Chon project: supabase-gray-dog
+3. Settings -> Database
+4. Copy "Connection string" (URI hoac Connection pooling)
+   Format: postgresql://postgres:password@db.xxx.supabase.co:5432/postgres
+
+BUOC 2: Them vao Vercel
+------------------------
+1. Vercel Dashboard -> Project -> Settings -> Environment Variables
+2. Them:
+   Name: DATABASE_URL
+   Value: Connection string vua copy (thay password bang password that)
+
+BUOC 3: Migrate Du Lieu
+------------------------
+pip install psycopg2-binary
+export DATABASE_URL='postgresql://postgres:password@db.xxx.supabase.co:5432/postgres'
+python3 setup_vercel_postgres.py
+
+BUOC 4: Deploy
+---------------
+git push
+
+XONG! Database se duoc upload len Supabase.
+
+LUU Y:
+- Thay password bang password that cua Supabase
+- Connection string phai day du, khong co [YOUR-PASSWORD]
+- Database se persistent va khong bi mat
+
