@@ -105,15 +105,23 @@ def index():
     thang_hien_tai = datetime.now().month
     nam_hien_tai = datetime.now().year
     
-    tong_nhap_thang = db.session.query(func.sum(NhapKho.so_luong)).filter(
-        extract('month', NhapKho.ngay_nhap) == thang_hien_tai,
-        extract('year', NhapKho.ngay_nhap) == nam_hien_tai
-    ).scalar() or 0
+    try:
+        tong_nhap_thang = db.session.query(func.sum(NhapKho.so_luong)).filter(
+            extract('month', NhapKho.ngay_nhap) == thang_hien_tai,
+            extract('year', NhapKho.ngay_nhap) == nam_hien_tai
+        ).scalar() or 0
+    except Exception as e:
+        print(f"Error querying tong_nhap_thang: {e}")
+        tong_nhap_thang = 0
     
-    tong_xuat_thang = db.session.query(func.sum(XuatKho.so_luong)).filter(
-        extract('month', XuatKho.ngay_xuat) == thang_hien_tai,
-        extract('year', XuatKho.ngay_xuat) == nam_hien_tai
-    ).scalar() or 0
+    try:
+        tong_xuat_thang = db.session.query(func.sum(XuatKho.so_luong)).filter(
+            extract('month', XuatKho.ngay_xuat) == thang_hien_tai,
+            extract('year', XuatKho.ngay_xuat) == nam_hien_tai
+        ).scalar() or 0
+    except Exception as e:
+        print(f"Error querying tong_xuat_thang: {e}")
+        tong_xuat_thang = 0
     
     # Top 10 cây có tồn kho cao nhất
     top_ton_kho = CayXanh.query.order_by(CayXanh.ton_kho.desc()).limit(10).all()
