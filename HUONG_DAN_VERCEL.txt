@@ -1,0 +1,78 @@
+HUONG DAN UPLOAD DATABASE LEN VERCEL
+=====================================
+
+VAN DE:
+- SQLite KHONG hoat dong tot tren Vercel
+- Database trong /tmp se BI MAT khi function restart
+- Moi request co the chay tren instance khac nhau
+- Khong co persistence
+
+GIAI PHAP: Vercel Postgres
+===========================
+
+BUOC 1: Tao Postgres Database
+------------------------------
+1. Vao Vercel Dashboard: https://vercel.com/dashboard
+2. Chon project -> Storage tab
+3. Click "Create Database" -> Chon "Postgres"
+4. Chon plan "Hobby" (mien phi)
+5. Click "Create"
+
+BUOC 2: Lay Connection String
+------------------------------
+1. Vao Storage -> Click vao database vua tao
+2. Copy "Connection String" (dang: postgres://...)
+3. Vao Settings -> Environment Variables
+4. Them:
+   - Name: POSTGRES_URL
+   - Value: Connection string vua copy
+5. Click "Save"
+
+BUOC 3: Migrate Du Lieu
+-----------------------
+1. Cai dat psycopg2:
+   pip install psycopg2-binary
+
+2. Chay script migrate:
+   export POSTGRES_URL='your-connection-string-here'
+   python3 setup_vercel_postgres.py
+
+Script se:
+- Doc du lieu tu SQLite local (instance/cayxanh.db)
+- Tao tables trong PostgreSQL
+- Migrate tat ca du lieu (cay, nhap, xuat)
+- Verify ket qua
+
+BUOC 4: Deploy
+--------------
+git add .
+git commit -m "Setup PostgreSQL"
+git push
+
+Vercel se tu dong:
+- Cai dat psycopg2-binary tu requirements.txt
+- Su dung POSTGRES_URL environment variable
+- Ket noi voi PostgreSQL
+- Du lieu se persistent!
+
+KIEM TRA
+--------
+Sau khi deploy:
+1. Vao Vercel Dashboard -> Functions -> View Logs
+2. Kiem tra xem co loi ket noi khong
+3. Truy cap web va kiem tra du lieu
+
+CAP NHAT DU LIEU
+----------------
+Khi co du lieu moi tu Excel:
+1. Chay update_data.py de cap nhat SQLite local
+2. Chay setup_vercel_postgres.py de sync len PostgreSQL
+3. Hoac cap nhat truc tiep tren web (nhap/xuat hang)
+
+LUU Y
+-----
+- Local: Van dung SQLite (instance/cayxanh.db)
+- Vercel: Dung PostgreSQL (persistent)
+- Database se khong bi mat khi function restart
+- Co the scale tot hon SQLite
+

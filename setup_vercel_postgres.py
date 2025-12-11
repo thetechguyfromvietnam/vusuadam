@@ -22,15 +22,23 @@ def migrate_to_postgres():
     
     if not postgres_url:
         print("\n❌ THIẾU POSTGRES CONNECTION STRING!")
-        print("\nCách lấy:")
+        print("\nCách lấy từ Vercel Postgres:")
         print("1. Vào Vercel Dashboard → Project → Storage → Create Database")
         print("2. Chọn 'Postgres'")
         print("3. Copy connection string")
-        print("4. Thêm vào Vercel Environment Variables:")
+        print("\nCách lấy từ Supabase:")
+        print("1. Vào https://app.supabase.com")
+        print("2. Chọn project → Settings → Database")
+        print("3. Copy Connection string (URI hoặc Connection pooling)")
+        print("\nThêm vào Environment Variables:")
         print("   - POSTGRES_URL hoặc DATABASE_URL")
         print("\nHoặc chạy script với:")
-        print("   POSTGRES_URL='your-connection-string' python3 setup_vercel_postgres.py")
+        print("   DATABASE_URL='your-connection-string' python3 setup_vercel_postgres.py")
         return False
+    
+    # Đảm bảo connection string đúng format
+    if postgres_url.startswith('postgres://'):
+        postgres_url = postgres_url.replace('postgres://', 'postgresql://', 1)
     
     # Đọc SQLite database
     sqlite_path = 'instance/cayxanh.db'
