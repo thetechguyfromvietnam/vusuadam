@@ -17,13 +17,16 @@ import sqlite3
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 
-# Database path
-db_path = 'cayxanh.db'
+# Database path - phải khớp với app.py
+# app.py dùng: sqlite:///cayxanh.db (local) hoặc sqlite:////tmp/cayxanh.db (Vercel)
+# Flask mặc định tìm trong instance/ folder nếu có
+db_path = os.path.join('instance', 'cayxanh.db')
 if not os.path.exists(db_path):
-    # Try instance folder
-    db_path = os.path.join('instance', 'cayxanh.db')
+    db_path = 'cayxanh.db'  # Fallback to root
     if not os.path.exists(db_path):
-        db_path = 'cayxanh.db'  # Will create new
+        # Tạo instance folder nếu chưa có
+        os.makedirs('instance', exist_ok=True)
+        db_path = os.path.join('instance', 'cayxanh.db')
 
 def update_database():
     """Cập nhật database từ 2 file Excel"""
