@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date
 import pandas as pd
 import os
+from urllib.parse import quote_plus, urlparse, urlunparse
 from sqlalchemy import func, extract
 from dotenv import load_dotenv
 
@@ -12,14 +13,43 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'kimbiofarm-secret-key-2025'
 
+def fix_postgres_url(url):
+    """Fix PostgreSQL connection string by properly encoding password and handling special characters"""
+    if not url or 'postgres' not in url.lower():
+        return url
+    
+    # Vercel Postgres uses postgres://, SQLAlchemy needs postgresql://
+    if url.startswith('postgres://'):
+        url = url.replace('postgres://', 'postgresql://', 1)
+    
+    # Parse the URL to extract components
+    try:
+        # Handle the case where password might contain special characters
+        # Format: postgresql://username:password@host:port/database
+        if '://' in url:
+            scheme, rest = url.split('://', 1)
+            if '@' in rest:
+                # Split into userinfo and host/path
+                userinfo, hostpath = rest.split('@', 1)
+                if ':' in userinfo:
+                    username, password = userinfo.split(':', 1)
+                    # URL encode the password to handle special characters
+                    encoded_password = quote_plus(password)
+                    # Reconstruct the URL
+                    fixed_url = f"{scheme}://{username}:{encoded_password}@{hostpath}"
+                    return fixed_url
+    except Exception as e:
+        print(f"Warning: Could not parse connection string: {e}")
+        # If parsing fails, return as-is (might work if password is already encoded)
+        pass
+    
+    return url
+
 # Database URI - Support both PostgreSQL (Vercel) and SQLite (local)
 if os.environ.get('POSTGRES_URL') or (os.environ.get('DATABASE_URL') and 'postgres' in os.environ.get('DATABASE_URL', '').lower()):
     # Use PostgreSQL (Vercel production)
     db_url = os.environ.get('POSTGRES_URL') or os.environ.get('DATABASE_URL')
-    # Vercel Postgres uses postgres://, SQLAlchemy needs postgresql://
-    if db_url.startswith('postgres://'):
-        db_url = db_url.replace('postgres://', 'postgresql://', 1)
-    db_path = db_url
+    db_path = fix_postgres_url(db_url)
 elif os.environ.get('VERCEL'):
     # Vercel without Postgres - use /tmp for SQLite (not recommended)
     db_path = 'sqlite:////tmp/cayxanh.db'
