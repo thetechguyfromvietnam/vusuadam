@@ -17,19 +17,8 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'kimbiofarm-secret-key-2025'
 
 # Cấu hình upload ảnh
-UPLOAD_FOLDER = 'static/uploads/images'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-
-# Tạo thư mục upload nếu chưa có
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
-
-def allowed_file(filename):
-    """Kiểm tra file có phải là ảnh hợp lệ không"""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Cấu hình instance_path cho Vercel (read-only filesystem)
 # Trên Vercel, chỉ có thể ghi vào /tmp
@@ -37,8 +26,24 @@ def allowed_file(filename):
 if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
     app.instance_path = '/tmp'
     # Trên Vercel, lưu ảnh vào /tmp
-    app.config['UPLOAD_FOLDER'] = '/tmp/uploads/images'
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    UPLOAD_FOLDER = '/tmp/uploads/images'
+else:
+    # Local development: lưu trong static/uploads/images
+    UPLOAD_FOLDER = 'static/uploads/images'
+
+# Tạo thư mục upload nếu chưa có (chỉ khi không phải trên Vercel hoặc nếu là /tmp)
+try:
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+except OSError:
+    # Nếu không thể tạo thư mục (read-only), bỏ qua
+    pass
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
+
+def allowed_file(filename):
+    """Kiểm tra file có phải là ảnh hợp lệ không"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def fix_postgres_url(url):
     """Fix PostgreSQL connection string by properly encoding password and handling special characters"""
@@ -571,7 +576,9 @@ def upload_anh_cay(ma_cay):
 def uploaded_file(filename):
     """Serve uploaded images"""
     upload_folder = app.config['UPLOAD_FOLDER']
-    if os.path.exists(os.path.join(upload_folder, filename)):
+    file_path = os.path.join(upload_folder, filename)
+    
+    if os.path.exists(file_path):
         return send_from_directory(upload_folder, filename)
     else:
         # Fallback: trả về 404 hoặc placeholder
