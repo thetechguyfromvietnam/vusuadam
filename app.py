@@ -9,7 +9,7 @@ from sqlalchemy.engine.url import URL
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
-from vercel_blob import put, head, delete
+import requests
 
 # Load environment variables from .env file
 load_dotenv()
@@ -60,6 +60,50 @@ def get_blob_url_from_path(path):
         return path
     # Nếu là local path, trả về None để dùng local serving
     return None
+
+def upload_to_vercel_blob(file_content, filename, content_type, token):
+    """Upload file to Vercel Blob storage using REST API"""
+    try:
+        url = "https://blob.vercel-storage.com/put"
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+        data = {
+            "pathname": f"images/{filename}",
+            "addRandomSuffix": "false"
+        }
+        files = {
+            "file": (filename, file_content, content_type)
+        }
+        
+        response = requests.post(url, headers=headers, data=data, files=files, timeout=30)
+        response.raise_for_status()
+        
+        result = response.json()
+        # The API returns the URL in different possible fields
+        return result.get("url") or result.get("href") or result.get("downloadUrl") or result.get("pathname")
+    except Exception as e:
+        print(f"Error uploading to Vercel Blob: {e}")
+        raise
+
+def delete_from_vercel_blob(blob_url, token):
+    """Delete file from Vercel Blob storage using REST API"""
+    try:
+        url = "https://blob.vercel-storage.com/delete"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "url": blob_url
+        }
+        
+        response = requests.post(url, headers=headers, json=data, timeout=30)
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"Error deleting from Vercel Blob: {e}")
+        return False
 
 def fix_postgres_url(url):
     """Fix PostgreSQL connection string by properly encoding password and handling special characters"""
@@ -522,15 +566,9 @@ def xoa_cay(ma_cay):
         if cay.hinh_anh:
             if is_blob_url(cay.hinh_anh):
                 # Xóa từ Blob storage
-                try:
-                    # Extract blob path từ URL (format: https://xxx.public.blob.vercel-storage.com/images/filename)
-                    parsed = urlparse(cay.hinh_anh)
-                    # Path sẽ là /images/filename, cần bỏ dấu / đầu
-                    blob_path = parsed.path.lstrip('/')
-                    if blob_path:
-                        delete(blob_path)
-                except Exception as e:
-                    print(f"Warning: Could not delete blob: {e}")
+                blob_token = os.environ.get('BLOB_READ_WRITE_TOKEN')
+                if blob_token:
+                    delete_from_vercel_blob(cay.hinh_anh, blob_token)
             else:
                 # Xóa file local
                 old_filename = os.path.basename(cay.hinh_anh)
@@ -589,15 +627,9 @@ def upload_anh_cay(ma_cay):
             if cay.hinh_anh:
                 if is_blob_url(cay.hinh_anh):
                     # Xóa từ Blob storage
-                    try:
-                        # Extract blob path từ URL (format: https://xxx.public.blob.vercel-storage.com/images/filename)
-                        parsed = urlparse(cay.hinh_anh)
-                        # Path sẽ là /images/filename, cần bỏ dấu / đầu
-                        blob_path = parsed.path.lstrip('/')
-                        if blob_path:
-                            delete(blob_path)
-                    except Exception as e:
-                        print(f"Warning: Could not delete old blob: {e}")
+                    blob_token = os.environ.get('BLOB_READ_WRITE_TOKEN')
+                    if blob_token:
+                        delete_from_vercel_blob(cay.hinh_anh, blob_token)
                 else:
                     # Xóa file local
                     old_filename = os.path.basename(cay.hinh_anh)
@@ -616,23 +648,9 @@ def upload_anh_cay(ma_cay):
                 file_content = file.read()
                 
                 # Upload to Blob storage
-                blob_path = f"images/{new_filename}"
+                content_type = file.content_type or f'image/{extension}'
                 try:
-                    result = put(blob_path, file_content, {
-                        'contentType': file.content_type or f'image/{extension}',
-                        'addRandomSuffix': False
-                    })
-                    
-                    # Extract URL from result (có thể là dict với key 'url' hoặc object với attribute url)
-                    if isinstance(result, dict):
-                        blob_url = result.get('url', result.get('href', str(result)))
-                    elif hasattr(result, 'url'):
-                        blob_url = result.url
-                    elif hasattr(result, 'href'):
-                        blob_url = result.href
-                    else:
-                        blob_url = str(result)
-                    
+                    blob_url = upload_to_vercel_blob(file_content, new_filename, content_type, blob_token)
                     # Lưu Blob URL vào database
                     cay.hinh_anh = blob_url
                 except Exception as e:
