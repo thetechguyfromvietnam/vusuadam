@@ -91,6 +91,23 @@ Mặc định sử dụng SQLite, không cần cấu hình gì thêm.
    ```
 3. Ứng dụng sẽ tự động sử dụng PostgreSQL khi phát hiện `DATABASE_URL` hoặc `POSTGRES_URL`
 
+## 📸 Cấu Hình Vercel Blob Storage (Ảnh)
+
+Ứng dụng hỗ trợ lưu trữ ảnh trên Vercel Blob storage cho production.
+
+### Production (Vercel Blob)
+1. Tạo Vercel Blob store trong Vercel Dashboard
+2. Lấy `BLOB_READ_WRITE_TOKEN` từ Vercel Dashboard
+3. Thêm vào environment variables trong Vercel:
+   ```
+   BLOB_READ_WRITE_TOKEN=your_token_here
+   ```
+4. Ứng dụng sẽ tự động sử dụng Blob storage khi có `BLOB_READ_WRITE_TOKEN`
+5. Nếu không có token, sẽ fallback về local storage (hoặc `/tmp` trên Vercel)
+
+### Local Development
+Mặc định lưu ảnh trong `static/uploads/images/` khi không có `BLOB_READ_WRITE_TOKEN`
+
 ## 📞 Hỗ Trợ
 
 Nếu có vấn đề, vui lòng kiểm tra:
@@ -101,5 +118,6 @@ Nếu có vấn đề, vui lòng kiểm tra:
 ---
 
 © 2025 KimBioFarm - Quản Lý Cây Xanh
+
 
 

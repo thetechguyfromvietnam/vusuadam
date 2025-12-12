@@ -9,6 +9,7 @@ from sqlalchemy.engine.url import URL
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
+from vercel_blob import put, head, delete
 
 # Load environment variables from .env file
 load_dotenv()
@@ -44,6 +45,21 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 def allowed_file(filename):
     """Kiểm tra file có phải là ảnh hợp lệ không"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def is_blob_url(url):
+    """Kiểm tra xem URL có phải là Vercel Blob URL không"""
+    if not url:
+        return False
+    return 'blob.vercel-storage.com' in url
+
+def get_blob_url_from_path(path):
+    """Lấy Blob URL từ path trong database (hỗ trợ cả Blob URL và local path)"""
+    if not path:
+        return None
+    if is_blob_url(path):
+        return path
+    # Nếu là local path, trả về None để dùng local serving
+    return None
 
 def fix_postgres_url(url):
     """Fix PostgreSQL connection string by properly encoding password and handling special characters"""
@@ -202,6 +218,25 @@ class XuatKho(db.Model):
     
     def __repr__(self):
         return f'<XuatKho {self.cay_xanh_id}: {self.so_luong} cây - {self.ngay_xuat}>'
+
+# Template context processor để sử dụng helper functions trong templates
+@app.context_processor
+def utility_processor():
+    def is_blob_url_template(url):
+        """Helper function để check Blob URL trong templates"""
+        return is_blob_url(url)
+    
+    def get_image_url(hinh_anh):
+        """Helper function để lấy URL ảnh (Blob URL hoặc local URL)"""
+        if not hinh_anh:
+            return None
+        if is_blob_url(hinh_anh):
+            return hinh_anh
+        # Local file: extract filename và tạo URL
+        filename = os.path.basename(hinh_anh)
+        return url_for('uploaded_file', filename=filename)
+    
+    return dict(is_blob_url=is_blob_url_template, get_image_url=get_image_url)
 
 # Routes
 @app.route('/')
@@ -485,13 +520,26 @@ def xoa_cay(ma_cay):
     try:
         # Xóa ảnh nếu có
         if cay.hinh_anh:
-            old_filename = os.path.basename(cay.hinh_anh)
-            old_path = os.path.join(app.config['UPLOAD_FOLDER'], old_filename)
-            if os.path.exists(old_path):
+            if is_blob_url(cay.hinh_anh):
+                # Xóa từ Blob storage
                 try:
-                    os.remove(old_path)
-                except:
-                    pass
+                    # Extract blob path từ URL (format: https://xxx.public.blob.vercel-storage.com/images/filename)
+                    parsed = urlparse(cay.hinh_anh)
+                    # Path sẽ là /images/filename, cần bỏ dấu / đầu
+                    blob_path = parsed.path.lstrip('/')
+                    if blob_path:
+                        delete(blob_path)
+                except Exception as e:
+                    print(f"Warning: Could not delete blob: {e}")
+            else:
+                # Xóa file local
+                old_filename = os.path.basename(cay.hinh_anh)
+                old_path = os.path.join(app.config['UPLOAD_FOLDER'], old_filename)
+                if os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except:
+                        pass
         
         # Xóa cây (cascade sẽ tự động xóa lịch sử nhập xuất)
         db.session.delete(cay)
@@ -539,24 +587,75 @@ def upload_anh_cay(ma_cay):
             
             # Xóa ảnh cũ nếu có
             if cay.hinh_anh:
-                old_filename = os.path.basename(cay.hinh_anh)
-                old_path = os.path.join(app.config['UPLOAD_FOLDER'], old_filename)
-                if os.path.exists(old_path):
+                if is_blob_url(cay.hinh_anh):
+                    # Xóa từ Blob storage
                     try:
-                        os.remove(old_path)
-                    except:
-                        pass
+                        # Extract blob path từ URL (format: https://xxx.public.blob.vercel-storage.com/images/filename)
+                        parsed = urlparse(cay.hinh_anh)
+                        # Path sẽ là /images/filename, cần bỏ dấu / đầu
+                        blob_path = parsed.path.lstrip('/')
+                        if blob_path:
+                            delete(blob_path)
+                    except Exception as e:
+                        print(f"Warning: Could not delete old blob: {e}")
+                else:
+                    # Xóa file local
+                    old_filename = os.path.basename(cay.hinh_anh)
+                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], old_filename)
+                    if os.path.exists(old_path):
+                        try:
+                            os.remove(old_path)
+                        except:
+                            pass
             
-            # Lưu file mới
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
-            file.save(file_path)
-            
-            # Lưu đường dẫn vào database (relative path)
-            if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
-                # Trên Vercel, có thể cần lưu vào cloud storage
-                cay.hinh_anh = f"/uploads/images/{new_filename}"
+            # Upload to Vercel Blob storage nếu có BLOB_READ_WRITE_TOKEN
+            blob_token = os.environ.get('BLOB_READ_WRITE_TOKEN')
+            if blob_token:
+                # Đọc file content
+                file.seek(0)
+                file_content = file.read()
+                
+                # Upload to Blob storage
+                blob_path = f"images/{new_filename}"
+                try:
+                    result = put(blob_path, file_content, {
+                        'contentType': file.content_type or f'image/{extension}',
+                        'addRandomSuffix': False
+                    })
+                    
+                    # Extract URL from result (có thể là dict với key 'url' hoặc object với attribute url)
+                    if isinstance(result, dict):
+                        blob_url = result.get('url', result.get('href', str(result)))
+                    elif hasattr(result, 'url'):
+                        blob_url = result.url
+                    elif hasattr(result, 'href'):
+                        blob_url = result.href
+                    else:
+                        blob_url = str(result)
+                    
+                    # Lưu Blob URL vào database
+                    cay.hinh_anh = blob_url
+                except Exception as e:
+                    print(f"Error uploading to Blob storage: {e}")
+                    # Fallback to local storage
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+                    file.seek(0)
+                    file.save(file_path)
+                    if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
+                        cay.hinh_anh = f"/uploads/images/{new_filename}"
+                    else:
+                        cay.hinh_anh = f"uploads/images/{new_filename}"
             else:
-                cay.hinh_anh = f"uploads/images/{new_filename}"
+                # Fallback: Lưu local
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+                file.seek(0)
+                file.save(file_path)
+                
+                # Lưu đường dẫn vào database (relative path)
+                if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
+                    cay.hinh_anh = f"/uploads/images/{new_filename}"
+                else:
+                    cay.hinh_anh = f"uploads/images/{new_filename}"
             
             cay.updated_at = datetime.now()
             db.session.commit()
@@ -574,7 +673,7 @@ def upload_anh_cay(ma_cay):
 
 @app.route('/uploads/images/<filename>')
 def uploaded_file(filename):
-    """Serve uploaded images"""
+    """Serve uploaded images (fallback for local files, Blob URLs are served directly)"""
     upload_folder = app.config['UPLOAD_FOLDER']
     file_path = os.path.join(upload_folder, filename)
     
