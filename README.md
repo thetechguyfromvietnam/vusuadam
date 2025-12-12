@@ -80,16 +80,53 @@ python app.py
 
 ## ⚙️ Cấu Hình Database
 
+### ⚠️ QUAN TRỌNG: Database trên Vercel
+
+**Trên Vercel, bạn PHẢI cấu hình PostgreSQL database. SQLite KHÔNG THỂ lưu trữ dữ liệu trên Vercel vì filesystem là read-only và dữ liệu sẽ bị mất sau mỗi lần deploy.**
+
 ### Local Development (SQLite)
 Mặc định sử dụng SQLite, không cần cấu hình gì thêm.
 
-### Production (PostgreSQL)
-1. Tạo file `.env` trong thư mục gốc
-2. Thêm connection string:
-   ```
-   DATABASE_URL=postgresql://postgres:your_password@db.xxx.supabase.co:5432/postgres
-   ```
-3. Ứng dụng sẽ tự động sử dụng PostgreSQL khi phát hiện `DATABASE_URL` hoặc `POSTGRES_URL`
+### Production (PostgreSQL) - BẮT BUỘC trên Vercel
+
+#### Cách 1: Sử dụng Vercel Postgres
+1. Vào Vercel Dashboard → Project → Storage
+2. Tạo Vercel Postgres database
+3. Vercel sẽ tự động thêm `POSTGRES_URL` vào environment variables
+4. Redeploy ứng dụng
+
+#### Cách 2: Sử dụng Supabase hoặc PostgreSQL khác
+1. Tạo PostgreSQL database (Supabase, Neon, Railway, etc.)
+2. **Lấy Database Password từ Supabase:**
+   - Vào Supabase Dashboard → Project Settings → Database
+   - Tìm phần "Database Password" hoặc "Connection string"
+   - Nếu chưa có password, click "Reset database password" để tạo mới
+   - Copy password (lưu ý: password có thể chứa ký tự đặc biệt)
+3. **Tạo Connection String:**
+   - Format: `postgresql://postgres:[YOUR_PASSWORD]@db.[project-ref].supabase.co:5432/postgres`
+   - Thay `[YOUR_PASSWORD]` bằng password thực tế từ Supabase
+   - Ví dụ: `postgresql://postgres:your_actual_password@db.qflrmqlsgkxxqopetolg.supabase.co:5432/postgres`
+4. **Thêm vào Vercel:**
+   - Vào Vercel Dashboard → Project → Settings → Environment Variables
+   - Click "Add New"
+   - **Key**: `DATABASE_URL` hoặc `POSTGRES_URL`
+   - **Value**: Dán connection string đã tạo (với password thực tế)
+   - **Environment**: Chọn tất cả (Production, Preview, Development)
+   - Click "Save"
+5. **Redeploy ứng dụng:**
+   - Vào Deployments tab
+   - Click "Redeploy" trên deployment mới nhất
+   - Hoặc push code mới để trigger auto-deploy
+
+#### Kiểm tra Database đã được cấu hình
+- Ứng dụng sẽ tự động phát hiện và sử dụng PostgreSQL
+- Nếu không có database URL, ứng dụng sẽ báo lỗi rõ ràng
+- Check logs trong Vercel để xem thông báo: "✓ Using PostgreSQL (Production)"
+
+### Lưu ý
+- **KHÔNG** sử dụng SQLite trên Vercel - dữ liệu sẽ bị mất
+- Database connection string phải có format: `postgresql://user:password@host:port/database`
+- Ứng dụng tự động xử lý URL encoding cho password có ký tự đặc biệt
 
 ## 📸 Cấu Hình Vercel Blob Storage (Ảnh)
 

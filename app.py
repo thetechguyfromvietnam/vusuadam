@@ -139,6 +139,44 @@ def fix_postgres_url(url):
     
     # Fallback: manual parsing with urllib
     try:
+        # Handle case where password contains @ character
+        # If URL has multiple @, we need to manually split
+        if url.count('@') > 1:
+            # Format: postgresql://user:pass@with@symbols@host:port/db
+            # We need to find the last @ which separates credentials from host
+            scheme_end = url.find('://') + 3
+            last_at = url.rfind('@')
+            
+            if last_at > scheme_end:
+                # Extract credentials part (user:password)
+                creds_part = url[scheme_end:last_at]
+                # Extract host part
+                host_part = url[last_at + 1:]
+                
+                # Split credentials
+                if ':' in creds_part:
+                    username, password = creds_part.split(':', 1)
+                    # URL encode both username and password
+                    encoded_username = quote_plus(username)
+                    encoded_password = quote_plus(password)
+                    
+                    # Parse host part
+                    host_parsed = urlparse('postgresql://' + host_part)
+                    netloc = f"{encoded_username}:{encoded_password}@{host_parsed.hostname}"
+                    if host_parsed.port:
+                        netloc += f":{host_parsed.port}"
+                    
+                    db_path = host_parsed.path.lstrip('/') if host_parsed.path else 'postgres'
+                    
+                    fixed_url = urlunparse((
+                        'postgresql',
+                        netloc,
+                        '/' + db_path if db_path else '/',
+                        '', '', ''
+                    ))
+                    return fixed_url
+        
+        # Normal parsing (no @ in password)
         parsed = urlparse(url)
         
         if parsed.username and parsed.password:
@@ -192,6 +230,7 @@ def fix_postgres_url(url):
 # - Production (Vercel/Supabase): Sử dụng PostgreSQL khi có DATABASE_URL hoặc POSTGRES_URL
 # - Local Development: Sử dụng SQLite
 db_url = os.environ.get('POSTGRES_URL') or os.environ.get('DATABASE_URL', '')
+is_vercel = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
 
 if db_url and 'postgres' in db_url.lower():
     # Production: Sử dụng PostgreSQL
@@ -199,20 +238,37 @@ if db_url and 'postgres' in db_url.lower():
         db_path = fix_postgres_url(db_url)
         if '@' in db_path:
             masked = db_path.split('@')[0].split(':')[0] + ':***@' + '@'.join(db_path.split('@')[1:])
-            print(f"Using PostgreSQL (Production): {masked}")
+            print(f"✓ Using PostgreSQL (Production): {masked}")
     except Exception as e:
-        print(f"Error parsing PostgreSQL connection string: {e}")
+        print(f"✗ Error parsing PostgreSQL connection string: {e}")
+        if is_vercel:
+            print("✗ CRITICAL: On Vercel, PostgreSQL is required! Data will be lost without it.")
+            raise Exception("PostgreSQL connection string is required on Vercel. Please set DATABASE_URL or POSTGRES_URL environment variable.")
         db_path = 'sqlite:///cayxanh.db'
-        print("Falling back to SQLite")
+        print("⚠ Falling back to SQLite (Local Development only)")
 else:
     # Local Development: Sử dụng SQLite
+    if is_vercel:
+        print("✗ CRITICAL: No DATABASE_URL or POSTGRES_URL found on Vercel!")
+        print("✗ Data will be lost after each deployment. Please configure PostgreSQL database.")
+        raise Exception("DATABASE_URL or POSTGRES_URL environment variable is required on Vercel. SQLite cannot persist data on serverless platforms.")
     db_path = 'sqlite:///cayxanh.db'
-    print("Using SQLite (Local Development)")
+    print("✓ Using SQLite (Local Development)")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,  # Verify connections before using
+    'pool_recycle': 300,     # Recycle connections after 5 minutes
+}
 
 db = SQLAlchemy(app)
+
+# Log database connection info
+print(f"Database URI configured: {db_path.split('@')[0] if '@' in db_path else 'SQLite'}")
+print(f"Vercel environment: {is_vercel}")
+if is_vercel and 'sqlite' in db_path.lower():
+    print("⚠ WARNING: SQLite detected on Vercel! Data will be lost. Please configure PostgreSQL.")
 
 # Models
 class CayXanh(db.Model):
