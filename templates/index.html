@@ -85,16 +85,40 @@
                         <thead>
                             <tr>
                                 <th>STT</th>
+                                <th>Ảnh</th>
                                 <th>Mã Cây</th>
                                 <th>Loại Cây</th>
                                 <th class="text-end">Tồn Kho</th>
+                                <th>Upload Ảnh</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for cay in top_ton_kho %}
                             <tr>
                                 <td>{{ loop.index }}</td>
-                                <td><strong>{{ cay.ma_cay }}</strong></td>
+                                <td>
+                                    {% if cay.hinh_anh %}
+                                    <a href="{{ url_for('chi_tiet_cay', ma_cay=cay.ma_cay) }}">
+                                        <img src="{{ get_image_url(cay.hinh_anh) }}" 
+                                             alt="{{ cay.loai_cay }}" 
+                                             class="img-thumbnail" 
+                                             style="width: 50px; height: 50px; object-fit: cover;">
+                                    </a>
+                                    {% else %}
+                                    <div class="bg-light d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                        <i class="bi bi-image text-muted"></i>
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>
+                                        <a href="{{ url_for('chi_tiet_cay', ma_cay=cay.ma_cay) }}" 
+                                           class="text-decoration-none text-primary">
+                                            {{ cay.ma_cay }}
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </a>
+                                    </strong>
+                                </td>
                                 <td>{{ cay.loai_cay }}</td>
                                 <td class="text-end">
                                     {% if cay.ton_kho and cay.ton_kho > 0 %}
@@ -103,10 +127,24 @@
                                     <span class="badge bg-secondary">0 cây</span>
                                     {% endif %}
                                 </td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('upload_anh_cay', ma_cay=cay.ma_cay) }}" 
+                                          enctype="multipart/form-data" class="d-inline upload-form-{{ loop.index }}">
+                                        <div class="input-group input-group-sm" style="width: 180px;">
+                                            <input type="file" class="form-control form-control-sm" 
+                                                   name="file" accept="image/*" 
+                                                   id="file-{{ loop.index }}"
+                                                   style="font-size: 0.75rem;">
+                                            <button type="submit" class="btn btn-primary btn-sm" title="Upload ảnh">
+                                                <i class="bi bi-upload"></i>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="4" class="text-center text-muted">Chưa có dữ liệu</td>
+                                <td colspan="6" class="text-center text-muted">Chưa có dữ liệu</td>
                             </tr>
                             {% endfor %}
                         </tbody>

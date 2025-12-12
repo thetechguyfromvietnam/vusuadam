@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date
 import pandas as pd
 import os
-from urllib.parse import quote_plus, urlparse, urlunparse
+from urllib.parse import quote_plus, urlparse, urlunparse, unquote
 from sqlalchemy import func, extract
 from sqlalchemy.engine.url import URL
 from dotenv import load_dotenv
@@ -499,8 +499,10 @@ def lich_su():
         # Hiển thị cả hai
         return render_template('lich_su.html', loai=loai)
 
-@app.route('/api/cay/<ma_cay>')
+@app.route('/api/cay/<path:ma_cay>')
 def api_cay(ma_cay):
+    ma_cay = unquote(ma_cay)
+    
     cay = CayXanh.query.filter_by(ma_cay=ma_cay).first()
     if cay:
         nhap_moi_nhat = NhapKho.query.filter_by(cay_xanh_id=cay.id).order_by(NhapKho.ngay_nhap.desc()).first()
@@ -513,8 +515,11 @@ def api_cay(ma_cay):
         })
     return jsonify({'success': False, 'message': 'Không tìm thấy!'})
 
-@app.route('/cay/<ma_cay>')
+@app.route('/cay/<path:ma_cay>')
 def chi_tiet_cay(ma_cay):
+    # URL decode để xử lý các ký tự đặc biệt trong ma_cay
+    ma_cay = unquote(ma_cay)
+    
     cay = CayXanh.query.filter_by(ma_cay=ma_cay).first()
     if not cay:
         flash('Không tìm thấy cây!', 'error')
@@ -547,9 +552,11 @@ def chi_tiet_cay(ma_cay):
                          tong_so_luong_nhap=tong_so_luong_nhap,
                          tong_so_luong_xuat=tong_so_luong_xuat)
 
-@app.route('/cay/<ma_cay>/xoa', methods=['POST'])
+@app.route('/cay/<path:ma_cay>/xoa', methods=['POST'])
 def xoa_cay(ma_cay):
     """Xóa cây và tất cả lịch sử nhập xuất liên quan"""
+    ma_cay = unquote(ma_cay)
+    
     cay = CayXanh.query.filter_by(ma_cay=ma_cay).first()
     if not cay:
         if request.is_json:
@@ -596,9 +603,11 @@ def xoa_cay(ma_cay):
     
     return redirect(url_for('ton_kho'))
 
-@app.route('/cay/<ma_cay>/upload-anh', methods=['POST'])
+@app.route('/cay/<path:ma_cay>/upload-anh', methods=['POST'])
 def upload_anh_cay(ma_cay):
     """Upload ảnh cho cây"""
+    ma_cay = unquote(ma_cay)
+    
     cay = CayXanh.query.filter_by(ma_cay=ma_cay).first()
     if not cay:
         if request.is_json:
