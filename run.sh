@@ -32,3 +32,4 @@ echo ""
 # Chạy ứng dụng
 python3 app.py
 
+

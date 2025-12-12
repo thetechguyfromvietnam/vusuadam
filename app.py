@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date
 import pandas as pd
@@ -7,6 +7,8 @@ from urllib.parse import quote_plus, urlparse, urlunparse
 from sqlalchemy import func, extract
 from sqlalchemy.engine.url import URL
 from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
+from werkzeug.exceptions import RequestEntityTooLarge
 
 # Load environment variables from .env file
 load_dotenv()
@@ -14,11 +16,29 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'kimbiofarm-secret-key-2025'
 
+# Cấu hình upload ảnh
+UPLOAD_FOLDER = 'static/uploads/images'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+# Tạo thư mục upload nếu chưa có
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
+
+def allowed_file(filename):
+    """Kiểm tra file có phải là ảnh hợp lệ không"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 # Cấu hình instance_path cho Vercel (read-only filesystem)
 # Trên Vercel, chỉ có thể ghi vào /tmp
 # Phải set trước khi khởi tạo SQLAlchemy để tránh lỗi read-only filesystem
 if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
     app.instance_path = '/tmp'
+    # Trên Vercel, lưu ảnh vào /tmp
+    app.config['UPLOAD_FOLDER'] = '/tmp/uploads/images'
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 def fix_postgres_url(url):
     """Fix PostgreSQL connection string by properly encoding password and handling special characters"""
@@ -137,6 +157,7 @@ class CayXanh(db.Model):
     ma_cay = db.Column(db.String(50), unique=True, nullable=False, index=True)
     loai_cay = db.Column(db.String(200), nullable=False)
     ton_kho = db.Column(db.Float, default=0.0, nullable=False)
+    hinh_anh = db.Column(db.String(500), nullable=True)  # Đường dẫn ảnh
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
@@ -457,6 +478,16 @@ def xoa_cay(ma_cay):
     ma_cay_value = cay.ma_cay
     
     try:
+        # Xóa ảnh nếu có
+        if cay.hinh_anh:
+            old_filename = os.path.basename(cay.hinh_anh)
+            old_path = os.path.join(app.config['UPLOAD_FOLDER'], old_filename)
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except:
+                    pass
+        
         # Xóa cây (cascade sẽ tự động xóa lịch sử nhập xuất)
         db.session.delete(cay)
         db.session.commit()
@@ -473,6 +504,78 @@ def xoa_cay(ma_cay):
         flash(error_msg, 'error')
     
     return redirect(url_for('ton_kho'))
+
+@app.route('/cay/<ma_cay>/upload-anh', methods=['POST'])
+def upload_anh_cay(ma_cay):
+    """Upload ảnh cho cây"""
+    cay = CayXanh.query.filter_by(ma_cay=ma_cay).first()
+    if not cay:
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Không tìm thấy cây!'})
+        flash('Không tìm thấy cây!', 'error')
+        return redirect(url_for('ton_kho'))
+    
+    if 'file' not in request.files:
+        flash('Không có file được chọn!', 'error')
+        return redirect(url_for('chi_tiet_cay', ma_cay=ma_cay))
+    
+    file = request.files['file']
+    if file.filename == '':
+        flash('Không có file được chọn!', 'error')
+        return redirect(url_for('chi_tiet_cay', ma_cay=ma_cay))
+    
+    if file and allowed_file(file.filename):
+        try:
+            # Tạo tên file an toàn: ma_cay_timestamp.extension
+            filename = secure_filename(file.filename)
+            extension = filename.rsplit('.', 1)[1].lower()
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            new_filename = f"{ma_cay}_{timestamp}.{extension}"
+            
+            # Xóa ảnh cũ nếu có
+            if cay.hinh_anh:
+                old_filename = os.path.basename(cay.hinh_anh)
+                old_path = os.path.join(app.config['UPLOAD_FOLDER'], old_filename)
+                if os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except:
+                        pass
+            
+            # Lưu file mới
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+            file.save(file_path)
+            
+            # Lưu đường dẫn vào database (relative path)
+            if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
+                # Trên Vercel, có thể cần lưu vào cloud storage
+                cay.hinh_anh = f"/uploads/images/{new_filename}"
+            else:
+                cay.hinh_anh = f"uploads/images/{new_filename}"
+            
+            cay.updated_at = datetime.now()
+            db.session.commit()
+            
+            flash('Upload ảnh thành công!', 'success')
+        except RequestEntityTooLarge:
+            flash('File quá lớn! Kích thước tối đa là 5MB.', 'error')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Lỗi khi upload ảnh: {str(e)}', 'error')
+    else:
+        flash('File không hợp lệ! Chỉ chấp nhận file ảnh (PNG, JPG, JPEG, GIF, WEBP).', 'error')
+    
+    return redirect(url_for('chi_tiet_cay', ma_cay=ma_cay))
+
+@app.route('/uploads/images/<filename>')
+def uploaded_file(filename):
+    """Serve uploaded images"""
+    upload_folder = app.config['UPLOAD_FOLDER']
+    if os.path.exists(os.path.join(upload_folder, filename)):
+        return send_from_directory(upload_folder, filename)
+    else:
+        # Fallback: trả về 404 hoặc placeholder
+        return "Image not found", 404
 
 @app.route('/import-excel', methods=['GET', 'POST'])
 def import_excel():

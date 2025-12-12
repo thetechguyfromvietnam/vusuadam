@@ -26,6 +26,23 @@
                 <h5 class="mb-0"><i class="bi bi-tree"></i> Thông Tin Cây</h5>
             </div>
             <div class="card-body">
+                <!-- Ảnh cây -->
+                <div class="text-center mb-3">
+                    {% if cay.hinh_anh %}
+                    <img src="{{ url_for('static', filename=cay.hinh_anh) }}" 
+                         alt="{{ cay.loai_cay }}" 
+                         class="img-fluid rounded" 
+                         style="max-height: 300px; max-width: 100%; object-fit: cover;">
+                    {% else %}
+                    <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height: 200px;">
+                        <div class="text-muted">
+                            <i class="bi bi-image" style="font-size: 3rem;"></i>
+                            <p class="mt-2">Chưa có ảnh</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
                 <table class="table table-borderless">
                     <tr>
                         <th width="40%">Mã Cây:</th>
@@ -54,6 +71,19 @@
                         </td>
                     </tr>
                 </table>
+                
+                <!-- Form upload ảnh -->
+                <hr>
+                <form method="POST" action="{{ url_for('upload_anh_cay', ma_cay=cay.ma_cay) }}" enctype="multipart/form-data">
+                    <div class="mb-2">
+                        <label class="form-label"><i class="bi bi-camera"></i> Upload Ảnh Cây</label>
+                        <input type="file" class="form-control" name="file" accept="image/*" required>
+                        <small class="form-text text-muted">Chấp nhận: PNG, JPG, JPEG, GIF, WEBP (tối đa 5MB)</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-upload"></i> Upload Ảnh
+                    </button>
+                </form>
             </div>
         </div>
     </div>
